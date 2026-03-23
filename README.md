@@ -1,8 +1,154 @@
-# 📚 Normalisasi Database — Studi Kasus Sistem Perpustakaan
-
-> Panduan langkah demi langkah proses normalisasi database dari **1NF → 2NF → 3NF** menggunakan studi kasus Sistem Peminjaman Buku Perpustakaan.
+# Nomer 1 :  Normalisasi Database Transaksi
 
 ---
+
+## Daftar Isi
+
+- [1NF – First Normal Form](#1nf--first-normal-form)
+- [2NF – Second Normal Form](#2nf--second-normal-form)
+- [3NF – Third Normal Form](#3nf--third-normal-form)
+- [Relasi Antar Tabel](#relasi-antar-tabel)
+- [Penjelasan Relasi](#penjelasan-relasi)
+
+---
+
+## 1NF – First Normal Form
+
+Pada tahap ini semua atribut bersifat atomik (tidak ada nilai yang berulang atau multi-nilai). Semua data digabung dalam satu tabel dengan composite primary key.
+
+**Tabel: Transaksi**
+
+| Kolom | Keterangan |
+|---|---|
+| `no_faktur` | PK (bagian dari composite PK) |
+| `kode_pelanggan` | PK (bagian dari composite PK) |
+| `kode_barang` | PK (bagian dari composite PK) |
+| `tanggal` | |
+| `nama_pelanggan` | |
+| `alamat` | |
+| `nama_barang` | |
+| `jumlah` | |
+| `harga_jual` | |
+
+> **Composite PK:** (`no_faktur`, `kode_pelanggan`, `kode_barang`)
+
+**Masalah di 1NF:** Terdapat *partial dependency* — `nama_pelanggan` dan `alamat` hanya bergantung pada `kode_pelanggan` (bukan seluruh composite PK), begitu pula `nama_barang` dan `harga_jual` hanya bergantung pada `kode_barang`.
+
+---
+
+## 2NF – Second Normal Form
+
+Partial dependency dihilangkan dengan memisahkan atribut yang hanya bergantung pada sebagian PK ke tabel tersendiri.
+
+**Tabel: Pelanggan**
+
+| Kolom | Keterangan |
+|---|---|
+| `kode_pelanggan` | PK |
+| `nama_pelanggan` | |
+| `alamat` | |
+
+**Tabel: Barang**
+
+| Kolom | Keterangan |
+|---|---|
+| `kode_barang` | PK |
+| `nama_barang` | |
+| `harga_jual` | |
+
+**Tabel: Transaksi**
+
+| Kolom | Keterangan |
+|---|---|
+| `no_faktur` | PK (bagian dari composite PK) |
+| `kode_barang` | PK (bagian dari composite PK) |
+| `tanggal` | |
+| `kode_pelanggan` | FK → Pelanggan |
+| `jumlah` | |
+
+> **Composite PK:** (`no_faktur`, `kode_barang`)
+
+**Masalah di 2NF:** Terdapat *transitive dependency* — `tanggal` dan `kode_pelanggan` hanya bergantung pada `no_faktur`, bukan pada keseluruhan composite PK (`no_faktur`, `kode_barang`).
+
+---
+
+## 3NF – Third Normal Form
+
+Transitive dependency dihilangkan dengan memisahkan header transaksi dan detail barang ke tabel yang berbeda.
+
+**Tabel: Pelanggan**
+
+| Kolom | Keterangan |
+|---|---|
+| `kode_pelanggan` | PK |
+| `nama_pelanggan` | |
+| `alamat` | |
+
+**Tabel: Barang**
+
+| Kolom | Keterangan |
+|---|---|
+| `kode_barang` | PK |
+| `nama_barang` | |
+| `harga_jual` | |
+
+**Tabel: Transaksi**
+
+| Kolom | Keterangan |
+|---|---|
+| `no_faktur` | PK |
+| `tanggal` | |
+| `kode_pelanggan` | FK → Pelanggan |
+
+**Tabel: Detail Transaksi**
+
+| Kolom | Keterangan |
+|---|---|
+| `no_faktur` | PK, FK → Transaksi |
+| `kode_barang` | PK, FK → Barang |
+| `jumlah` | |
+
+> **Composite PK:** (`no_faktur`, `kode_barang`)
+
+---
+
+## Relasi Antar Tabel
+
+```
+Pelanggan ──────────< Transaksi ──────────< Detail Transaksi >────────── Barang
+(kode_pelanggan PK)   (no_faktur PK)        (no_faktur PK,FK)            (kode_barang PK)
+                      (kode_pelanggan FK)    (kode_barang PK,FK)
+```
+
+| Relasi | Tipe | Keterangan |
+|---|---|---|
+| Pelanggan → Transaksi | One-to-Many (1:N) | Satu pelanggan bisa melakukan banyak transaksi |
+| Transaksi → Detail Transaksi | One-to-Many (1:N) | Satu transaksi bisa memiliki banyak baris detail |
+| Barang → Detail Transaksi | One-to-Many (1:N) | Satu barang bisa muncul di banyak detail transaksi |
+
+---
+
+## Penjelasan Relasi
+
+### Pelanggan → Transaksi (1:N)
+Satu pelanggan dapat melakukan banyak transaksi, namun setiap transaksi hanya dimiliki oleh satu pelanggan. Kolom `kode_pelanggan` di tabel **Transaksi** bertindak sebagai *foreign key* yang mereferensikan tabel **Pelanggan**.
+
+### Transaksi → Detail Transaksi (1:N)
+Satu faktur/transaksi dapat memiliki banyak baris detail barang. Kolom `no_faktur` di tabel **Detail Transaksi** bertindak sebagai *foreign key* yang mereferensikan tabel **Transaksi**.
+
+### Barang → Detail Transaksi (1:N)
+Satu barang dapat muncul di banyak detail transaksi yang berbeda. Kolom `kode_barang` di tabel **Detail Transaksi** bertindak sebagai *foreign key* yang mereferensikan tabel **Barang**.
+
+### Catatan: PK, FK pada Detail Transaksi
+Kolom `no_faktur` dan `kode_barang` di tabel **Detail Transaksi** memiliki **dua peran sekaligus**:
+- **PK** – keduanya membentuk *composite primary key* yang menjadi identitas unik setiap baris.
+- **FK** – keduanya juga mereferensikan tabel lain (Transaksi dan Barang) untuk menjaga integritas data.
+
+Tabel **Detail Transaksi** berfungsi sebagai *junction table* yang menyelesaikan relasi many-to-many antara Transaksi dan Barang.
+
+---
+
+# Nomer 4 📚 Normalisasi Database — Studi Kasus Sistem Perpustakaan
 
 ## 📋 Daftar Isi
 
@@ -233,20 +379,6 @@ Jenis_Buku    ──── 1 : N ────▶  Buku
                                                     │ jenis_buku       │
                                                     └──────────────────┘
 ```
-
----
-
-## ✏️ Koreksi Diagram Asal
-
-Ditemukan **kesalahan** pada diagram normalisasi asal:
-
-| Posisi | Kondisi Asal (Salah ❌) | Seharusnya (Benar ✅) |
-|---|---|---|
-| **2NF — Tabel Buku** | Sudah menggunakan `kodejenis_buku (FK)` | Atribut `jenis_buku` masih langsung di tabel Buku |
-| **3NF — Tabel Jenis** | Tabel Jenis muncul di 3NF | Sudah benar — tabel Jenis_Buku memang dibuat di 3NF |
-
-**Penjelasan:**  
-Pemisahan `jenis_buku` ke tabel `Jenis_Buku` adalah untuk menghilangkan **transitive dependency**, yang merupakan syarat **3NF**, bukan 2NF. Menempatkan `kodejenis_buku (FK)` di tabel Buku pada tahap 2NF artinya melompati satu tahap normalisasi.
 
 ---
 
