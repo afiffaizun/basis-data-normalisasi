@@ -1,16 +1,8 @@
+Normalisasi data adalah proses mengatur dan menstrukturkan data dalam basis data untuk mengurangi redundansi (duplikasi), meningkatkan integritas, dan konsistensi data
+
+--- 
+
 # Nomer 1 :  Normalisasi Database Transaksi
-
----
-
-## Daftar Isi
-
-- [1NF – First Normal Form](#1nf--first-normal-form)
-- [2NF – Second Normal Form](#2nf--second-normal-form)
-- [3NF – Third Normal Form](#3nf--third-normal-form)
-- [Relasi Antar Tabel](#relasi-antar-tabel)
-- [Penjelasan Relasi](#penjelasan-relasi)
-
----
 
 ## 1NF – First Normal Form
 
@@ -148,19 +140,160 @@ Tabel **Detail Transaksi** berfungsi sebagai *junction table* yang menyelesaikan
 
 ---
 
+
+
+# Nomer 2 Inventory
+
+## Data Awal (UNF)
+
+Sebelum normalisasi, semua data disimpan dalam satu tabel datar (*flat table*) tanpa struktur yang jelas. Data berulang dan tidak konsisten.
+
+| Kolom              | Keterangan                        |
+|--------------------|-----------------------------------|
+| no_faktur          | Nomor faktur pembelian            |
+| tgl_faktur         | Tanggal faktur                    |
+| jatuh_tempo        | Tanggal jatuh tempo pembayaran    |
+| kode_pemasok       | Kode pemasok                      |
+| nama_pemasok       | Nama pemasok                      |
+| alamat_perusahaan  | Alamat perusahaan pemasok         |
+| kode_barang        | Kode barang yang dibeli           |
+| nama               | Nama barang                       |
+| jumlah             | Jumlah barang dibeli              |
+| harga              | Harga satuan barang               |
+| total              | Total harga (jumlah × harga)      |
+
+**Masalah pada UNF:**
+- Data pemasok berulang di setiap baris faktur
+- Data barang berulang di setiap baris transaksi
+- Kolom `total` adalah *derived attribute* (dapat dihitung, tidak perlu disimpan)
+- Tidak ada primary key yang jelas
+
+---
+
+## 1NF — First Normal Form
+
+### Syarat 1NF
+> Setiap kolom hanya boleh menyimpan **satu nilai atomik** (tidak ada grup berulang), dan setiap baris harus unik.
+
+### Perubahan yang Dilakukan
+- Memastikan setiap sel hanya berisi satu nilai
+- Menetapkan **primary key gabungan**: `(no_faktur, kode_pemasok, kode_barang)`
+- Seluruh data masih berada dalam **satu tabel**
+
+### Struktur 1NF
+
+```
+Tabel Pembelian
+├── no_faktur        (PK)
+├── tgl_faktur
+├── jatuh_tempo
+├── kode_pemasok     (PK)
+├── nama_pemasok
+├── alamat_perusahaan
+├── kode_barang      (PK)
+├── nama
+├── jumlah
+├── harga
+└── total
+```
+
+**Catatan:** Data sudah atomik, namun masih terdapat *partial dependency* dan *transitive dependency* yang harus diselesaikan pada tahap berikutnya.
+
+---
+
+## 2NF — Second Normal Form
+
+### Syarat 2NF
+> Memenuhi 1NF, dan setiap atribut non-key harus **bergantung penuh** (*fully dependent*) pada seluruh primary key — bukan hanya sebagian (*partial dependency*).
+
+### Perubahan yang Dilakukan
+- Tabel dipecah berdasarkan ketergantungan penuh
+- `alamat_perusahaan` dipindah ke **Tabel Pemasok** (bukan dihilangkan)
+- `jumlah` dipindah ke **Tabel Detail Transaksi** karena bergantung pada kombinasi `(no_faktur, kode_barang)`
+- `total` **dihapus** karena merupakan *derived attribute* (`jumlah × harga`)
+- `Tabel Detail Transaksi` dibuat sebagai tabel junction
+
+### Struktur 2NF
+
+```
+Tabel Transaksi
+├── no_faktur        (PK)
+├── tgl_faktur
+├── jatuh_tempo
+├── jumlah
+└── kode_pemasok     (FK → Tabel Pemasok)
+
+
+Tabel Pemasok
+├── kode_pemasok     (PK)
+├── nama_pemasok
+└── alamat_perusahaan   ← jangan sampai hilang!
+
+Tabel Barang
+├── kode_barang      (PK)
+├── nama
+├── jumlah
+└── harga
+
+```
+---
+
+## 3NF — Third Normal Form
+
+### Syarat 3NF
+> Memenuhi 2NF, dan tidak ada atribut non-key yang bergantung pada atribut non-key lainnya (*transitive dependency*).
+
+### Struktur 3NF (Final)
+
+```
+Tabel Transaksi
+├── no_faktur        (PK)
+├── tgl_faktur
+├── jatuh_tempo
+└── kode_pemasok     (FK → Tabel Pemasok)
+
+Tabel Pemasok
+├── kode_pemasok     (PK)   ← pastikan ditandai PK
+├── nama_pemasok
+└── alamat_perusahaan
+
+Tabel Barang
+├── kode_barang      (PK)
+├── nama
+└── harga
+
+Tabel Detail Transaksi
+├── no_faktur        (FK, PK)
+├── kode_barang      (FK, PK)
+└── jumlah
+```
+
+---
+
+## Relasi Antar Tabel Kardinalitas
+
+```
+TABEL_PEMASOK  ||──o{  TABEL_TRANSAKSI
+    (1 pemasok bisa melakukan banyak transaksi)
+
+TABEL_TRANSAKSI  ||──o{  TABEL_DETAIL_TRANSAKSI
+    (1 faktur bisa memiliki banyak baris barang)
+
+TABEL_BARANG  ||──o{  TABEL_DETAIL_TRANSAKSI
+    (1 barang bisa muncul di banyak faktur)
+```
+
+| Relasi                                | Tipe         | FK di Tabel                | Merujuk ke               |
+|---------------------------------------|--------------|----------------------------|--------------------------|
+| Pemasok → Transaksi                   | One-to-Many  | `kode_pemasok` di Transaksi | Tabel Pemasok (PK)       |
+| Transaksi → Detail Transaksi          | One-to-Many  | `no_faktur` di Detail       | Tabel Transaksi (PK)     |
+| Barang → Detail Transaksi             | One-to-Many  | `kode_barang` di Detail     | Tabel Barang (PK)        |
+| Transaksi ↔ Barang (via Detail)       | Many-to-Many | — (dijembatani tabel Detail) | —                       |
+
+---
+
 # Nomer 3 Studi Kasus Inventory
 
----
-
-## Daftar Isi
-
-- [Bentuk Normal Pertama (1NF)](#bentuk-normal-pertama-1nf)
-- [Bentuk Normal Kedua (2NF)](#bentuk-normal-kedua-2nf)
-- [Bentuk Normal Ketiga (3NF)](#bentuk-normal-ketiga-3nf)
-- [Diagram Relasi (ERD)](#diagram-relasi-erd)
-- [Ringkasan Perubahan](#ringkasan-perubahan)
-
----
 
 | Bentuk Normal | Syarat |
 |---|---|
