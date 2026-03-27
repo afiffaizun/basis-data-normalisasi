@@ -148,6 +148,269 @@ Tabel **Detail Transaksi** berfungsi sebagai *junction table* yang menyelesaikan
 
 ---
 
+# Nomer 3 Studi Kasus Inventory
+
+---
+
+## Daftar Isi
+
+- [Bentuk Normal Pertama (1NF)](#bentuk-normal-pertama-1nf)
+- [Bentuk Normal Kedua (2NF)](#bentuk-normal-kedua-2nf)
+- [Bentuk Normal Ketiga (3NF)](#bentuk-normal-ketiga-3nf)
+- [Diagram Relasi (ERD)](#diagram-relasi-erd)
+- [Ringkasan Perubahan](#ringkasan-perubahan)
+
+---
+
+| Bentuk Normal | Syarat |
+|---|---|
+| **1NF** | Setiap kolom bernilai atomik (tidak ada repeating group) |
+| **2NF** | Memenuhi 1NF + tidak ada partial dependency |
+| **3NF** | Memenuhi 2NF + tidak ada transitive dependency |
+
+---
+
+## Studi Kasus
+
+Data awal adalah tabel transaksi penjualan dalam bentuk flat (belum dinormalisasi):
+
+| Field | Keterangan |
+|---|---|
+| customer_id | ID pelanggan |
+| nama | Nama pelanggan |
+| alamat | Alamat pelanggan |
+| no_invoice | Nomor invoice |
+| tanggal | Tanggal transaksi |
+| name_bill | Nama penagihan |
+| alamat_bill | Alamat penagihan |
+| sales_person | Nama sales |
+| produk_id | ID produk |
+| nama_produk | Nama produk |
+| quantity | Jumlah produk dibeli |
+| price / harga | Harga satuan produk |
+| diskon | Diskon transaksi |
+| total | Total harga |
+
+**Masalah yang ditemukan:**
+- Data pelanggan (nama, alamat) berulang di setiap baris transaksi
+- Data produk (nama_produk, harga) berulang di setiap baris invoice
+- Tidak ada pemisahan antara data master dan data transaksi
+
+---
+
+## Bentuk Normal Pertama (1NF)
+
+### Syarat 1NF
+- Setiap kolom hanya menyimpan **satu nilai** (atomik)
+- Tidak ada **repeating group** atau array dalam satu kolom
+- Setiap baris unik, diidentifikasi oleh **primary key**
+
+### Langkah yang Dilakukan
+
+1. Pastikan tidak ada kolom yang berisi lebih dari satu nilai
+2. Tentukan **Composite Primary Key**: `(no_invoice, produk_id)` karena satu invoice bisa memiliki banyak produk
+3. Semua kolom dipastikan bernilai atomik
+
+### Hasil 1NF
+
+**Tabel Transaksi**
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| no_invoice | PK | VARCHAR | Nomor invoice |
+| produk_id | PK | INT | ID produk |
+| customer_id | - | INT | ID pelanggan |
+| nama | - | VARCHAR | Nama pelanggan |
+| alamat | - | VARCHAR | Alamat pelanggan |
+| tanggal | - | DATE | Tanggal transaksi |
+| name_bill | - | VARCHAR | Nama penagihan |
+| alamat_bill | - | VARCHAR | Alamat penagihan |
+| sales_person | - | VARCHAR | Nama sales |
+| nama_produk | - | VARCHAR | Nama produk |
+| quantity | - | INT | Jumlah produk dibeli |
+| harga | - | DECIMAL | Harga satuan produk |
+| diskon | - | DECIMAL | Diskon transaksi |
+| total | - | DECIMAL | Total harga |
+
+**Status:** Sudah 1NF karena semua nilai atomik dan tidak ada repeating group.
+
+---
+
+## Bentuk Normal Kedua (2NF)
+
+### Syarat 2NF
+- Memenuhi 1NF
+- Tidak ada **partial dependency** — setiap atribut non-key harus bergantung pada **seluruh** primary key, bukan hanya sebagian
+
+### Identifikasi Partial Dependency
+
+Dengan Composite PK `(no_invoice, produk_id)`:
+
+| Atribut | Bergantung pada | Masalah |
+|---|---|---|
+| nama, alamat | `customer_id` → `no_invoice` | Partial dependency |
+| nama_produk, harga | `produk_id` saja | Partial dependency |
+| **quantity, diskon, total** | `(no_invoice, produk_id)` | ✅ Full dependency |
+| tanggal, name_bill, alamat_bill, sales_person | `no_invoice` saja | Partial dependency |
+
+### Langkah yang Dilakukan
+
+1. **Pisahkan data pelanggan** → Tabel `Customer` (bergantung pada `customer_id`)
+2. **Pisahkan data invoice** → Tabel `Invoice` (bergantung pada `no_invoice`)
+3. **Pisahkan data produk** → Tabel `Produk` (bergantung pada `produk_id`)
+4. **Buat tabel junction** → Tabel `Detail Invoice` dengan atribut yang bergantung pada `(no_invoice, produk_id)`
+
+> **Catatan penting:** `quantity`, `diskon`, dan `total` dipindahkan ke `Detail Invoice`, **bukan** ke tabel `Produk`. Ketiga atribut ini bergantung pada kombinasi invoice + produk, bukan pada produk saja.
+
+### Hasil 2NF
+
+**Tabel Customer**
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| customer_id | PK | INT | ID unik pelanggan |
+| nama | - | VARCHAR | Nama pelanggan |
+| alamat | - | VARCHAR | Alamat pelanggan |
+
+**Tabel Invoice**
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| no_invoice | PK | VARCHAR | Nomor invoice |
+| customer_id | FK | INT | Referensi ke Customer |
+| tanggal | - | DATE | Tanggal transaksi |
+| name_bill | - | VARCHAR | Nama penagihan |
+| alamat_bill | - | VARCHAR | Alamat penagihan |
+| sales_person | - | VARCHAR | ⚠️ Masih akan diperbaiki di 3NF |
+
+**Tabel Produk**
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| produk_id | PK | INT | ID unik produk |
+| nama_produk | - | VARCHAR | Nama produk |
+| harga | - | DECIMAL | Harga satuan produk |
+
+**Tabel Detail Invoice**
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| no_invoice | PK, FK | VARCHAR | Referensi ke Invoice |
+| produk_id | PK, FK | INT | Referensi ke Produk |
+| quantity | - | INT | Jumlah produk dibeli |
+| diskon | - | DECIMAL | Diskon per baris |
+| total | - | DECIMAL | Total per baris |
+
+---
+
+## Bentuk Normal Ketiga (3NF)
+
+### Syarat 3NF
+- Memenuhi 2NF
+- Tidak ada **transitive dependency** — atribut non-key tidak boleh bergantung pada atribut non-key lainnya
+
+### Identifikasi Transitive Dependency
+
+Pada tabel `Invoice`:
+
+```
+no_invoice → sales_person → (data sales lainnya)
+```
+
+`sales_person` adalah atribut non-key yang bisa memiliki data turunan sendiri (nama lengkap, ID sales, dsb.). Ini adalah transitive dependency karena:
+
+```
+no_invoice → sales_person
+sales_person → nama_sales, data_sales_lainnya
+```
+
+Selain itu, tabel `Detail Invoice` pada 2NF **tidak memiliki `quantity`**, padahal `total` tidak bisa dihitung tanpanya (`total = quantity × harga − diskon`).
+
+### Langkah yang Dilakukan
+
+1. **Pisahkan data sales** → Tabel `Sales` baru dengan `sales_id` sebagai PK
+2. **Ganti `sales_person`** di tabel `Invoice` dengan FK `sales_id`
+3. **Tambahkan `quantity`** ke tabel `Detail Invoice` (wajib ada untuk menghitung `total`)
+4. Pertimbangkan `total` sebagai *derived attribute* — idealnya dihitung dari `quantity × harga − diskon`, namun bisa tetap disimpan untuk kebutuhan histori harga
+
+### Hasil 3NF (Final)
+
+**Tabel Customer**
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| customer_id | PK | INT | ID unik pelanggan |
+| nama | - | VARCHAR | Nama pelanggan |
+| alamat | - | VARCHAR | Alamat pelanggan |
+
+**Tabel Sales** *(tabel baru)*
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| sales_id | PK | INT | ID unik sales |
+| nama_sales | - | VARCHAR | Nama lengkap sales |
+
+**Tabel Invoice**
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| no_invoice | PK | VARCHAR | Nomor invoice |
+| customer_id | FK | INT | Referensi ke Customer |
+| sales_id | FK | INT | Referensi ke Sales *(menggantikan sales_person)* |
+| tanggal | - | DATE | Tanggal transaksi |
+| name_bill | - | VARCHAR | Nama penagihan |
+| alamat_bill | - | VARCHAR | Alamat penagihan |
+
+**Tabel Produk**
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| produk_id | PK | INT | ID unik produk |
+| nama_produk | - | VARCHAR | Nama produk |
+| harga | - | DECIMAL | Harga satuan produk |
+
+**Tabel Detail Invoice**
+
+| Kolom | Key | Tipe Data | Keterangan |
+|---|---|---|---|
+| no_invoice | PK, FK | VARCHAR | Referensi ke Invoice |
+| produk_id | PK, FK | INT | Referensi ke Produk |
+| quantity | - | INT | Jumlah produk dibeli *(ditambahkan)* |
+| diskon | - | DECIMAL | Diskon per baris |
+| total | - | DECIMAL | Derived: `quantity × harga − diskon` |
+
+---
+
+### Kardinalitas Relasi
+
+| Relasi | Tipe | Penjelasan |
+|---|---|---|
+| `Customer` → `Invoice` | One-to-Many | Satu customer bisa membuat banyak invoice |
+| `Sales` → `Invoice` | One-to-Many | Satu sales bisa menangani banyak invoice |
+| `Invoice` → `Detail Invoice` | One-to-Many | Satu invoice bisa memiliki banyak baris produk |
+| `Produk` → `Detail Invoice` | One-to-Many | Satu produk bisa muncul di banyak invoice |
+
+---
+
+## Ringkasan Perubahan
+
+| | 1NF | 2NF | 3NF |
+|---|---|---|---|
+| Jumlah tabel | 1 | 4 | 5 |
+| Partial dependency | Ada | **Dihilangkan** | Tidak ada |
+| Transitive dependency | Ada | Ada | **Dihilangkan** |
+| `quantity` di Detail Invoice | - | Belum ada | **Ditambahkan** |
+| `sales_person` | Di Invoice | Di Invoice | **Dipisah ke tabel Sales** |
+
+### Keuntungan Setelah Normalisasi
+
+- **Tidak ada redundansi** — data pelanggan, produk, dan sales hanya disimpan sekali
+- **Mudah diupdate** — mengubah nama produk cukup di satu baris tabel `Produk`
+- **Integritas data terjaga** — relasi antar tabel dikendalikan oleh FK
+- **Tidak ada anomali insert/delete** — menambah produk baru tidak membutuhkan transaksi, menghapus invoice tidak menghapus data produk
+---
+
+
 # Nomer 4 📚 Normalisasi Database — Studi Kasus Sistem Perpustakaan
 
 ## 📋 Daftar Isi
